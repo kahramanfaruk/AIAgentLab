@@ -10,28 +10,32 @@ build/
 venv/
 env/
 
-# Environment & Secrets
+# Environment and secrets
 .env
 .env.*
 !.env.example
 
-# Data (never commit raw docs or vector DBs)
+# Data
 data/raw/*
 data/processed/*
 data/vector_db/*
-!data/**/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/vector_db/.gitkeep
 
-# IDE
+# IDE and OS files
 .vscode/
 .idea/
 .DS_Store
 *.swp
 
-# Testing
+# Testing and coverage
 .pytest_cache/
 .coverage
 htmlcov/
 coverage.xml
+.mypy_cache/
+.ruff_cache/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -39,3 +43,6 @@ coverage.xml
 # Logs
 logs/
 *.log
+
+# Streamlit
+.streamlit/secrets.toml

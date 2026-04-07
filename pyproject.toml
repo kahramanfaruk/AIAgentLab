@@ -1,20 +1,19 @@
-[build-system]
-requires = ["setuptools>=77", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "aiagentlab-rag"
 version = "0.1.0"
-description = "A production-grade RAG Q&A Agent that answers questions over documents using Gemini and local vector search."
+description = "A modular RAG Q&A system for answering questions over uploaded documents using local embeddings, ChromaDB, Groq, FastAPI, and Streamlit."
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
-license = "MIT"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Faruk Kahraman" }
+]
+
 dependencies = [
-  "langchain>=0.3.0",
-  "langchain-community>=0.3.0",
   "chromadb>=0.5.0",
   "sentence-transformers>=3.0.0",
-  "google-genai>=1.0.0",
+  "groq>=0.9.0",
+  "pydantic>=2.7.0",
   "pydantic-settings>=2.0.0",
   "fastapi>=0.115.0",
   "uvicorn>=0.30.0",
@@ -35,14 +34,6 @@ dev = [
   "ipykernel>=6.0.0",
   "httpx>=0.27.0",
 ]
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["agent*", "api*", "config*"]
-exclude = ["data*", "docs*", "notebooks*", "tests*", "ui*"]
 
 [tool.ruff]
 line-length = 88

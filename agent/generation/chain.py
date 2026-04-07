@@ -73,19 +73,26 @@ class RAGChain:
         return f"""
 You are a careful retrieval-augmented assistant.
 
-Use ONLY the context below.
-First identify the most relevant evidence, then answer directly.
+Answer using ONLY the provided context.
 
-If the answer is not clearly supported by the context, say exactly:
-"I don't have enough information in the provided documents to answer this confidently."
+Important:
+- A paper's purpose or objective may be implied by abstract-style statements such as:
+  "In this work..."
+  "We conduct..."
+  "We investigate..."
+  "Our central finding..."
+- If the context strongly implies the objective, answer directly in plain language.
+- Do not require the exact words "purpose" or "objective" to appear.
+- Only say "I don't have enough information..." if the context truly does not support a reasonable answer.
 
 Rules:
 1. Do not use outside knowledge.
 2. Keep the answer to 2-4 sentences.
 3. Cite chunk IDs inline like [chunk-id].
-4. For questions about a paper's purpose, objective, goal, or main contribution, prioritize abstract and introduction evidence.
-5. Prefer explicit statements such as "In this work..." and "Our central finding..."
-6. Do not mention "most relevant evidence" in the final answer. Just answer the question directly.
+4. For questions about a paper's goal, objective, or purpose, prioritize abstract and introduction evidence.
+5. Do not say "the most relevant evidence is..." in the answer.
+6. Answer in natural language, not as a retrieval report.
+7. For research papers, prefer answers in this form: "The paper aims to ... Its main finding is ..."
 
 Question:
 {question}
