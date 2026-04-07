@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiagentlab-rag"
+version = "0.1.0"
+description = "A production-grade RAG Q&A Agent that answers questions over documents using Gemini and local vector search."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "MIT"
+dependencies = [
+  "langchain>=0.3.0",
+  "langchain-community>=0.3.0",
+  "chromadb>=0.5.0",
+  "sentence-transformers>=3.0.0",
+  "google-generativeai>=0.7.0",
+  "pydantic-settings>=2.0.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "streamlit>=1.38.0",
+  "pypdf>=5.0.0",
+  "python-docx>=1.1.0",
+  "python-dotenv>=1.0.0",
+  "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "pytest-asyncio>=0.23.0",
+  "ruff>=0.6.0",
+  "mypy>=1.11.0",
+  "ipykernel>=6.0.0",
+  "httpx>=0.27.0",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent*", "api*", "config*"]
+exclude = ["data*", "docs*", "notebooks*", "tests*", "ui*"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+strict = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

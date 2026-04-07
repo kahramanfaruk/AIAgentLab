@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Data (never commit raw docs or vector DBs)
+data/raw/*
+data/processed/*
+data/vector_db/*
+!data/**/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
