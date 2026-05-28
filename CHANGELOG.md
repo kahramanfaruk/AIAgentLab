@@ -12,9 +12,19 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 - ChromaDB-based retrieval pipeline.
 - Groq-based generation client.
 - Streamlit-based document question answering interface.
+- Centralized configuration with `pydantic-settings` and per-backend switches.
+- Ports-and-adapters backends with free local defaults and AWS adapters: Bedrock LLM, Bedrock Titan embeddings, OpenSearch vector store, S3 document store, and DynamoDB memory and escalation store.
+- Autonomous agent loop with a tool registry, rule-based guardrails, model-confidence scoring, and human-in-the-loop escalation.
+- Evaluation framework with retrieval, faithfulness, tool-selection, and escalation-decision metrics plus a synthetic insurance dataset.
+- Serverless ingestion Lambda handler and Terraform IaC for S3, DynamoDB, and Lambda, with cost-gated OpenSearch and SageMaker modules.
+- FastAPI endpoints for health, ingest, ask, agent, documents, and escalations.
+- Dockerfile and Docker Compose stack, including an optional AWS profile with LocalStack and open-source OpenSearch.
+- Test suite covering adapters (via moto), guardrails, the agent loop, evaluation, the API, and the ingestion flow.
 
 ### Changed
-- Standardized the active v0.1 LLM path around Groq.
+- Standardized the active v0.1 LLM path around Groq, now pluggable with Amazon Bedrock.
+- The RAG chain and retriever depend on backend-agnostic protocols rather than concrete Chroma and Groq classes.
+- The Streamlit UI adds an agent mode that shows the reasoning trace and escalations.
 - Improved retrieval behavior for paper-purpose and objective-style questions.
 - Refined prompt instructions for grounded paper summarization.
 

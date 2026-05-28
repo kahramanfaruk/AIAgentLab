@@ -1,0 +1,55 @@
+# Local development stack. By default only the API and UI run on the free local
+# backends. The optional "aws" profile adds LocalStack (S3, DynamoDB, Lambda) and
+# an open-source OpenSearch node for exercising the AWS-pluggable paths at no
+# cost. Start them with: docker compose --profile aws up.
+
+services:
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+
+  ui:
+    build: .
+    command: streamlit run ui/app.py --server.address 0.0.0.0 --server.port 8501
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - api
+
+  localstack:
+    image: localstack/localstack:3
+    profiles:
+      - aws
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,dynamodb,lambda
+      - DEBUG=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    profiles:
+      - aws
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"

@@ -1,14 +1,38 @@
+"""Backend-agnostic retrieval over a vector store.
+
+The retriever over-fetches candidates from any :class:`VectorStore` backend and
+applies a lightweight heuristic re-ranking tuned for research-paper questions
+(purpose, method, and findings). It depends only on the vector-store and
+embedder protocols, so it works identically with Chroma or OpenSearch.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from agent.ingestion.embedder import LocalEmbedder
-from agent.retrieval.vector_store import ChromaVectorStore
+from agent.ingestion.base import Embedder
+from agent.retrieval.base import VectorStore
 
 
 @dataclass(slots=True)
 class RetrievalResult:
+    """A retrieved chunk with its re-ranking score.
+
+    Attributes
+    ----------
+    chunk_id : str
+        Identifier of the matched chunk.
+    content : str
+        Chunk text.
+    metadata : dict
+        Chunk metadata.
+    distance : float or None
+        Backend distance; smaller means more similar.
+    score : float
+        Heuristic re-ranking score; larger is better.
+    """
+
     chunk_id: str
     content: str
     metadata: dict[str, Any]
@@ -17,46 +41,55 @@ class RetrievalResult:
 
 
 class Retriever:
-    def __init__(
-        self,
-        vector_store: ChromaVectorStore,
-        embedder: LocalEmbedder,
-    ) -> None:
+    """Retrieve and re-rank chunks for a query.
+
+    Parameters
+    ----------
+    vector_store : VectorStore
+        Backend used for nearest-neighbour search.
+    embedder : Embedder
+        Backend used to embed the query.
+    """
+
+    def __init__(self, vector_store: VectorStore, embedder: Embedder) -> None:
         self.vector_store = vector_store
         self.embedder = embedder
 
     def retrieve(self, query: str, top_k: int = 5) -> list[RetrievalResult]:
+        """Retrieve the ``top_k`` best chunks for ``query``.
+
+        Parameters
+        ----------
+        query : str
+            Natural-language query.
+        top_k : int, optional
+            Number of results to return after re-ranking.
+
+        Returns
+        -------
+        list of RetrievalResult
+            Results ordered by descending re-ranking score.
+        """
         query_embedding = self.embedder.embed_query(query)
 
         raw_k = max(top_k * 3, 12)
-        results = self.vector_store.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=raw_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        matches = self.vector_store.search(query_embedding, top_k=raw_k)
 
-        documents = results.get("documents", [[]])[0]
-        metadatas = results.get("metadatas", [[]])[0]
-        distances = results.get("distances", [[]])[0]
-        ids = results.get("ids", [[]])[0]
-
-        retrieval_results: list[RetrievalResult] = []
-        for chunk_id, content, metadata, distance in zip(ids, documents, metadatas, distances):
-            metadata = metadata or {}
-            score = self._score_result(query, metadata, content, distance)
-
-            retrieval_results.append(
-                RetrievalResult(
-                    chunk_id=chunk_id,
-                    content=content,
-                    metadata=metadata,
-                    distance=distance,
-                    score=score,
-                )
+        results = [
+            RetrievalResult(
+                chunk_id=match.chunk_id,
+                content=match.content,
+                metadata=match.metadata,
+                distance=match.distance,
+                score=self._score_result(
+                    query, match.metadata, match.content, match.distance
+                ),
             )
+            for match in matches
+        ]
 
-        retrieval_results.sort(key=lambda x: x.score, reverse=True)
-        return retrieval_results[:top_k]
+        results.sort(key=lambda result: result.score, reverse=True)
+        return results[:top_k]
 
     def _score_result(
         self,
@@ -65,20 +98,45 @@ class Retriever:
         content: str,
         distance: float | None,
     ) -> float:
+        """Compute a heuristic re-ranking score.
+
+        Parameters
+        ----------
+        query : str
+            The query text.
+        metadata : dict
+            Chunk metadata.
+        content : str
+            Chunk text.
+        distance : float or None
+            Backend distance; smaller means more similar.
+
+        Returns
+        -------
+        float
+            Re-ranking score; larger is better.
+        """
         query_lower = query.lower()
         content_lower = content.lower()
 
         base_score = -(distance if distance is not None else 999.0)
 
-        page_number = metadata.get("page_number")
+        raw_page: Any = metadata.get("page_number")
         try:
-            page_number = int(page_number)
+            page_number: int | None = int(raw_page)
         except (TypeError, ValueError):
             page_number = None
 
         bonus = 0.0
 
-        purpose_keywords = ["purpose", "objective", "goal", "main point", "contribution", "abstract"]
+        purpose_keywords = [
+            "purpose",
+            "objective",
+            "goal",
+            "main point",
+            "contribution",
+            "abstract",
+        ]
         if any(keyword in query_lower for keyword in purpose_keywords):
             if page_number == 1:
                 bonus += 2.5
@@ -106,22 +164,3 @@ class Retriever:
                 bonus += 1.2
 
         return base_score + bonus
-
-
-if __name__ == "__main__":
-    store = ChromaVectorStore()
-    embedder = LocalEmbedder(device="cpu")
-    retriever = Retriever(vector_store=store, embedder=embedder)
-
-    query = "What is the main objective of this paper?"
-    results = retriever.retrieve(query=query, top_k=5)
-
-    print(f"Retrieved {len(results)} results.")
-    for idx, result in enumerate(results, start=1):
-        print("-" * 80)
-        print(f"Result {idx}")
-        print(f"Chunk ID: {result.chunk_id}")
-        print(f"Distance: {result.distance}")
-        print(f"Score: {result.score}")
-        print(f"Metadata: {result.metadata}")
-        print(result.content[:700])

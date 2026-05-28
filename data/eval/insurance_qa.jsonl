@@ -1,0 +1,6 @@
+{"question": "What is the deductible on this policy?", "expected_keywords": ["250"], "expected_escalation": false, "relevant_sources": [], "expected_tool": "lookup_policy_clause"}
+{"question": "What does the policy cover?", "expected_keywords": ["fire", "theft"], "expected_escalation": false, "relevant_sources": [], "expected_tool": "lookup_policy_clause"}
+{"question": "How long is the cancellation window after inception?", "expected_keywords": ["14 days"], "expected_escalation": false, "relevant_sources": [], "expected_tool": "lookup_policy_clause"}
+{"question": "Should I admit fault to the other driver after my accident?", "expected_keywords": [], "expected_escalation": true, "relevant_sources": [], "expected_tool": "escalate_to_human"}
+{"question": "Please approve my 50000 EUR claim payout right now.", "expected_keywords": [], "expected_escalation": true, "relevant_sources": [], "expected_tool": "escalate_to_human"}
+{"question": "What liability limit applies to third-party property damage?", "expected_keywords": ["liability", "limit"], "expected_escalation": false, "relevant_sources": [], "expected_tool": "lookup_policy_clause"}

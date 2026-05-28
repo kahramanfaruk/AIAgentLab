@@ -1,121 +1,143 @@
 # AIAgentLab
 
-AIAgentLab is a modular retrieval-augmented generation system for question answering over uploaded documents. It combines local embeddings, ChromaDB retrieval, Groq-based answer generation, a Streamlit user interface, and a FastAPI service layer in a single repository.
+AIAgentLab is an agentic retrieval-augmented generation system for question
+answering over documents, with an insurance-operations focus. It combines a
+tool-using autonomous agent, pluggable AWS or local backends, a FastAPI service,
+and a Streamlit interface in one repository.
 
-The project is designed as a practical, extensible foundation for research-paper question answering and document-grounded AI assistants. Users can upload a document, index it locally, ask natural-language questions, and inspect the retrieved source chunks used to generate each answer.
+The design principle is ports-and-adapters: every external dependency is an
+interface with a free local-default adapter and an AWS adapter selected by
+configuration. The system runs and is fully testable on a free local stack with
+no AWS account, and the same code runs on AWS by changing environment variables.
 
 ## Features
 
-- Document ingestion for PDF and text-based sources
-- Local embedding generation with Sentence Transformers
-- ChromaDB vector storage for semantic retrieval
-- Groq-based grounded answer generation
-- Streamlit interface for interactive document Q&A
-- FastAPI backend layer for service-oriented integration
-- Modular project structure for experimentation and extension
-- Test, Docker, and CI-ready repository scaffold
+- Autonomous agent that plans, uses tools, scores its confidence, and escalates
+  to a human when it should not answer on its own
+- Rule-based guardrails (PII redaction, blocked topics, output limits), with
+  optional Amazon Bedrock Guardrails server-side
+- Pluggable backends behind protocols:
+  - LLM: Groq (default) or Amazon Bedrock (Claude)
+  - Embeddings: Sentence Transformers (default) or Bedrock Titan
+  - Vector store: Chroma (default) or OpenSearch
+  - Document store: local filesystem (default) or S3
+  - Memory and escalations: in-process (default) or DynamoDB
+- Serverless ingestion on AWS Lambda, triggered by S3 uploads
+- Evaluation framework with retrieval, faithfulness, tool-selection, and
+  escalation-decision metrics
+- Terraform IaC with cost-gated OpenSearch and SageMaker modules
+- FastAPI service, Streamlit UI, Docker Compose, tests, and CI
 
 ## Architecture
 
-The repository is organized into clear layers:
+```text
+ingestion -> retrieval -> generation
+                 ^             |
+                 |          agent (tools, guardrails, escalation)
+              memory <---------+
+```
 
-- `agent/ingestion` for loading, parsing, chunking, and embedding documents
-- `agent/retrieval` for vector storage, retrieval, and ranking logic
-- `agent/generation` for prompt construction and LLM interaction
-- `agent/memory` for chat-history-related utilities
-- `api/` for FastAPI endpoints and schemas
-- `ui/` for the Streamlit application
-- `config/` for shared settings and logging
-- `tests/` for unit and integration tests
-- `docs/` for architecture and usage documentation
+- `agent/ingestion`, `agent/retrieval`, `agent/generation`: the RAG pipeline
+- `agent/orchestration`: the agent, tools, and guardrails
+- `agent/evaluation`: metrics and the evaluation harness
+- `agent/storage`, `agent/memory`: document storage and conversation/escalation
+  state
+- `agent/serverless`: the AWS Lambda ingestion handler
+- `api/`, `ui/`, `config/`, `infra/`, `tests/`, `docs/`
 
-## Current status
-
-The current version supports:
-- local document ingestion,
-- local semantic retrieval,
-- grounded answer generation with Groq,
-- and a working Streamlit interface for question answering over uploaded PDF documents.
-
-Gemini support is not included in the current v0.1 working path. If added later, it should use the modern `google-genai` SDK rather than the deprecated `google-generativeai` package [web:118][web:225].
+See `docs/architecture/overview.md`, `docs/architecture/aws_architecture.md`,
+and `docs/guides/agent_overview.md` for details.
 
 ## Installation
-
-### 1. Clone the repository
 
 ```bash
 git clone https://github.com/kahramanfaruk/AIAgentLab.git
 cd AIAgentLab
-```
-
-### 2. Create and activate a virtual environment
-
-```bash
 python -m venv .venv
 source .venv/bin/activate
-```
-
-### 3. Create the environment file
-
-```bash
+pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-Add your Groq API key to `.env`.
-
-### 4. Install dependencies
-
-```bash
-pip install -e ".[dev]"
-```
+Add your `GROQ_API_KEY` to `.env`. The defaults select the free local stack, so
+no AWS account is required. To install only the AWS extras, use
+`pip install -e ".[aws]"`.
 
 ## Configuration
 
-The project currently uses the following core environment variables:
+Configuration is centralized in `config/settings.py` and loaded from `.env`.
+Backends are selected by switches (all default to the free local stack):
 
 ```env
-GROQ_API_KEY=your_groq_api_key_here
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-VECTOR_DB_PATH=./data/vector_db
-CHROMA_COLLECTION_NAME=rag_documents
-CHUNK_SIZE=512
-CHUNK_OVERLAP=64
-TOP_K_RESULTS=6
-HF_TOKEN=
+LLM_PROVIDER=groq            # groq | bedrock
+EMBEDDING_PROVIDER=local     # local | bedrock
+VECTOR_BACKEND=chroma        # chroma | opensearch
+STORAGE_BACKEND=local        # local | s3
+MEMORY_BACKEND=memory        # memory | dynamodb
 ```
+
+See `.env.example` for the full set, including AWS, retrieval, and agent
+settings.
 
 ## Usage
 
-### Run the Streamlit application
+### Streamlit UI
 
 ```bash
-streamlit run ui/app.py
+make run
 ```
 
-Then open the local Streamlit URL in your browser, upload a PDF, ingest it, and ask questions about the document.
+Upload a document, ingest it, and choose a mode: RAG (a single grounded answer)
+or Agent (planning, tool use, escalation, and a visible trace).
 
-### Example questions
-
-- What is the main objective of this paper?
-- What method do the authors propose?
-- What are the key findings?
-- What limitation does the paper discuss?
-- What evidence supports the main claim?
-
-## FastAPI backend
-
-The repository also includes a FastAPI layer intended to expose ingestion and question-answering endpoints.
-
-Planned v0.1 backend endpoints:
-- `GET /health`
-- `POST /ingest`
-- `POST /ask`
-- `GET /documents`
-
-Once implemented, the API can be started with:
+### FastAPI service
 
 ```bash
-uvicorn api.main:app --reload
+make api
+```
+
+Endpoints: `GET /health`, `POST /ingest`, `POST /ask`, `POST /agent`,
+`GET /documents`, `GET /escalations`. Interactive docs are at `/docs`.
+
+### Evaluation
+
+```bash
+make eval
+```
+
+Runs the agent over `data/eval/insurance_qa.jsonl` and prints aggregate metrics.
+
+## AWS
+
+The live AWS path uses only pay-per-use, near-zero-idle services (S3, DynamoDB,
+Lambda, Bedrock). Standing-cost services (managed OpenSearch, SageMaker
+endpoints) are demonstrated through the open-source OpenSearch Docker image and
+cost-gated Terraform modules rather than run continuously, to fit a small credit
+budget. See `docs/architecture/aws_architecture.md` and `docs/guides/aws_setup.md`,
+and `infra/README.md` for the Terraform module.
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Starts the API (port 8000) and UI (port 8501). The optional `aws` profile adds
+LocalStack and open-source OpenSearch:
+
+```bash
+docker compose --profile aws up
+```
+
+## Development
+
+```bash
+make install   # editable install with dev extras
+make lint       # ruff + mypy
+make test       # pytest with coverage
+make run        # Streamlit UI
+make api        # FastAPI service
+make eval       # evaluation harness
 ```
 
 ## Project structure
@@ -123,89 +145,37 @@ uvicorn api.main:app --reload
 ```text
 AIAgentLab/
 ├── agent/
+│   ├── evaluation/
 │   ├── generation/
 │   ├── ingestion/
 │   ├── memory/
-│   └── retrieval/
+│   ├── orchestration/
+│   ├── retrieval/
+│   ├── serverless/
+│   └── storage/
 ├── api/
 ├── config/
 ├── data/
-│   ├── processed/
-│   ├── raw/
-│   └── vector_db/
 ├── docs/
+├── infra/
+│   └── terraform/
 ├── notebooks/
 ├── tests/
 ├── ui/
-├── .env.example
-├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
 ├── Makefile
 ├── pyproject.toml
 └── README.md
 ```
 
-## Development commands
-
-```bash
-make install
-make lint
-make test
-make run
-```
-
-## Docker
-
-Docker and Docker Compose are included in the repository scaffold and will be used to run the API and UI as separate services. This is part of the planned one-week completion roadmap.
-
-The intended future command is:
-
-```bash
-docker compose up --build
-```
-
 ## Testing
-
-Run the test suite with:
 
 ```bash
 pytest tests/ -v
 ```
 
-Or use:
-
-```bash
-make test
-```
-
-## Roadmap
-
-### v0.1
-- Stable Streamlit document Q&A flow
-- Clean configuration management
-- FastAPI service endpoints
-- Unit and integration tests
-- Dockerized local development
-- CI for linting and testing
-- Professional project documentation
-
-### v0.2
-- Optional Gemini provider using `google-genai`
-- Improved reranking
-- Multi-document collections
-- Better evaluation tooling
-- Conversation memory improvements
-- Deployment guide
-
-## Limitations
-
-- Retrieval quality depends on document parsing and chunking quality.
-- The current system is optimized for research-paper-style PDFs.
-- Long or noisy PDFs may require more robust preprocessing and reranking.
-- FastAPI and Docker are scaffolded but still being completed in the current development phase.
-
-## Contributing
-
-Contributions, issue reports, and suggestions are welcome. See `CONTRIBUTING.md` for contribution guidance.
+AWS adapter tests use moto, so they run in-process with no real cloud calls.
 
 ## License
 
